@@ -1,0 +1,7 @@
+# Prompt-Orchestrator dependencies (Python 3.10+)
+google-genai>=0.8.0       # unified SDK: Gemini text/image + Veo video generation
+pydantic>=2.6             # Scene Graph schema + Gemini structured outputs
+python-dotenv>=1.0        # load .env
+numpy>=1.26               # embedding math for retrieval (RRF / cosine)
+opencv-python>=4.9        # last-frame extraction for scene-extension chaining
+rich>=13.7                # readable CLI progress/logging (optional but nice)
