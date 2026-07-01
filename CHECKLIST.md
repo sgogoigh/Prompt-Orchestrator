@@ -99,6 +99,22 @@ runs (they reuse the already-proven `veo_generate`); only the QC decision logic 
 
 ---
 
+## Prompt Requirement Graph + core eval-gate  ✅ (verified live, no Veo spend)
+The thing the project was really after: evaluate/complete the PROMPT before generation.
+- [x] `graph/prompt_graph.py` — requirement ontology (23 nodes, tiers, 25 dependency edges, topo layers)
+- [x] `graph/prompt_fill.py` — MAP (user) + dependency-ordered FILL (parents constrain children) + deterministic technical
+- [x] `graph/prompt_eval.py` — pre-generation prompt scoring (coherence/specificity/completeness + `invention_ratio` + defect flag)
+- [x] `graph/prompt_serialize.py` — graph → 5-part NL prompt + API params
+- [x] `graph/prompt_flow.py` — `build_prompt(idea)` runs all five stages
+- [x] `api.generate_gated()` — wires the graph into the core with an EVAL-GATE (refuse / revise / warn)
+- [x] Demo `examples/run_promptgraph.py` (build+eval) and `examples/run_gated.py` (the gate)
+- **Finding:** scoring `completeness` is degenerate post-fill (the fill makes almost everything
+  complete), so the gate leans on **coherence + specificity + real defects (conflicts / missing-
+  required)**, with `invention_ratio` as a transparency signal. Verified: refused a weak prompt
+  (0.767, invention 0.895) with no spend; auto-revised a rich prompt to 0.982.
+- [ ] Follow-up (deferred by request): refine the ontology + dependency edges; extend to multi-shot;
+      optionally treat high `invention_ratio` as a "confirm before spend" prompt-back to the user.
+
 ## Cross-cutting (any phase)
 - [ ] `orchestrate/critique.py` — self-critique against Veo limitations
 - [ ] Cost/latency telemetry (Gemini tokens, Veo seconds)
