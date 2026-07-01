@@ -98,11 +98,13 @@ def generate(req: VeoRequest, *, out_dir: str | None = None) -> list[str]:
     # (api-key path) raises. Veo 3.1 generates native audio by default here, so we
     # simply omit the flag. `reference_images` (Ingredients) + `last_frame` ARE
     # supported on the Developer API.
+    # Developer API constraint: sampleCount must be 1 ("out of bound … between 1
+    # and 1"). Multiple candidates = multiple calls (best-of-N loops in api.py).
     config = types.GenerateVideosConfig(
         aspect_ratio=req.aspect_ratio,
         resolution=req.resolution,
         duration_seconds=_normalize_duration(req.resolution, req.duration_s),
-        number_of_videos=req.num_videos,
+        number_of_videos=1,
         reference_images=_ref_images(req.reference_images),
         last_frame=_one_image(req.last_frame),
     )
@@ -177,6 +179,8 @@ def generate_chain(
     *,
     durations: list[int] | None = None,
     out_dir: str | None = None,
+    qc_gate=None,        # optional callable(clip_path, shot_prompt) -> bool (passes?)
+    qc_retries: int = 0,  # re-roll a clip up to N times if it fails the gate
 ) -> list[str]:
     """SCENE_EXTENSION via LAST-FRAME CHAINING (Developer-API compatible).
 
@@ -216,16 +220,28 @@ def generate_chain(
             number_of_videos=1,  # a chain renders one canonical clip per shot
             reference_images=_ref_images(req.reference_images) if i == 0 else None,
         )
-        op = client().models.generate_videos(
-            model=model,
-            prompt=prompt,
-            image=_one_image(prev_frame),
-            config=config,
-        )
-        paths, _ = _await_and_save(op, out_dir, tag=f"chain{i}")
-        all_paths.extend(paths)
-        if paths:
-            prev_frame = _last_frame_png(paths[-1], out_dir, i) or prev_frame
+        # Generate this clip; if a QC gate is provided, re-roll it (bounded) until
+        # it passes — so a broken clip never seeds the rest of the chain.
+        attempt = 0
+        clip = None
+        while True:
+            op = client().models.generate_videos(
+                model=model,
+                prompt=prompt,
+                image=_one_image(prev_frame),
+                config=config,
+            )
+            paths, _ = _await_and_save(op, out_dir, tag=f"chain{i}")
+            clip = paths[-1] if paths else None
+            if not clip or qc_gate is None or attempt >= qc_retries:
+                break
+            if qc_gate(clip, prompt):
+                break
+            attempt += 1  # failed gate, retries remain -> re-roll this shot
+
+        if clip:
+            all_paths.append(clip)
+            prev_frame = _last_frame_png(clip, out_dir, i) or prev_frame
     return all_paths
 
 

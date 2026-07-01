@@ -107,9 +107,52 @@ def generate_image(prompt: str, *, out_path: str, model: str | None = None) -> s
     raise RuntimeError("No image returned by the model.")
 
 
-def analyze_video(video_path: str, question: str, schema: Type[T], *, model: str | None = None) -> T:
-    """Multimodal QC: ask Gemini about a generated clip (adherence, artifacts, lip-sync).
+def analyze_video(
+    video_path: str,
+    question: str,
+    schema: Type[T],
+    *,
+    model: str | None = None,
+    poll_seconds: int = 3,
+    timeout_s: int = 240,
+) -> T:
+    """Multimodal QC: upload a clip via the Files API and ask Gemini about it.
 
-    Used by qc/qc.py. TODO: upload via Files API and attach as a video part.
+    Uploaded video files are PROCESSING for a few seconds before they become
+    ACTIVE and usable as a content part; we poll until ready, then run a
+    structured-output judgment (adherence, artifacts, subject presence).
     """
-    raise NotImplementedError("QC vision call — wire up Files API upload + video part (P5).")
+    import time
+
+    c = client()
+    f = c.files.upload(file=video_path)
+
+    def _state(file) -> str:
+        st = getattr(file, "state", None)
+        return getattr(st, "name", str(st))
+
+    waited = 0
+    while _state(f) == "PROCESSING":
+        if waited >= timeout_s:
+            raise RuntimeError(f"video upload still PROCESSING after {timeout_s}s")
+        time.sleep(poll_seconds)
+        waited += poll_seconds
+        f = c.files.get(name=f.name)
+
+    if _state(f) == "FAILED":
+        raise RuntimeError("video upload processing FAILED")
+
+    cfg = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=schema,
+        temperature=0.2,  # judgment, not creativity
+    )
+    resp = c.models.generate_content(
+        model=model or settings.gemini_flash,
+        contents=[f, question],
+        config=cfg,
+    )
+    parsed = getattr(resp, "parsed", None)
+    if isinstance(parsed, schema):
+        return parsed
+    return schema.model_validate_json(resp.text)

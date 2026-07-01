@@ -75,11 +75,27 @@ Legend: `[ ]` todo · `[~]` stubbed (signature + docstring, not implemented) · 
       each clip generates fresh audio at the seam)
 - [ ] Follow-up: 1080p/4K upscale pass (Veo upscaling) if a 720p path is ever used
 
-## P5 — Closing the loop (QC)
-- [~] `qc/qc.py` — Gemini-vision adherence/artifact scoring
-- [ ] Bounded auto-regeneration on low score (`MAX_QC_RETRIES`)
-- [ ] Veo Fast draft → Standard promotion + 4K upscale on approval
-- [ ] **Milestone:** auto-reject + retry a failed take without human input
+## P5 — Closing the loop (QC)  ✅ (core verified live; regen path wired)
+- [x] `qc/qc.py` — Gemini-vision QC via Files API (`analyze_video`): scores adherence, subject
+      presence, artifacts, lip-sync. **Verified discriminating live**: correct prompt → 1.0/accept,
+      wrong prompt → 0.0/reject; and across two real clips 1.0 vs 0.5 → correct pick.
+- [x] `passes_gate` + `pick_best` — best-of-N selection; gates ONLY on the trustworthy signals
+      (adherence + subject). Artifacts/lip-sync are advisory (vision models unreliable there).
+- [x] Bounded auto-regeneration (`MAX_QC_RETRIES`): single/timestamp path does best-of-N over Fast
+      candidates + re-roll on hard-gate fail; `generate_chain` gates each clip before it seeds the
+      next (a broken clip never poisons the chain).
+- [x] **Milestone:** auto-reject + re-pick without human input — proven (rejected 0.5 clip, picked 1.0).
+- [~] Fast draft → "Standard promotion" = re-render winning prompt on Standard model (a NEW take,
+      not an upscale). Wire as opt-in if desired.
+- [ ] ~~4K upscale on approval~~ — **not available on the Gemini Developer API** (no video-upscale
+      method; Vertex/Flow only). `upscale_image` exists but is images-only.
+
+### P5 upside verdict
+Significant upside for **(a) gross-failure gating** and **(b) best-of-N selection over cheap Fast
+candidates** — especially in chains, where a bad clip cascades. Marginal/negative for subtle-artifact
+or lip-sync gating (false-reject risk → wasted re-rolls). QC as a *selector* (near-zero extra cost)
+beats QC as a blind *re-roll trigger* (unbounded cost). Not live-tested: the paid regen/best-of-N Veo
+runs (they reuse the already-proven `veo_generate`); only the QC decision logic was exercised (free).
 
 ---
 

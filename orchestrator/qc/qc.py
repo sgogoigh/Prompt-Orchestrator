@@ -32,6 +32,26 @@ QC_QUESTION = (
 
 
 def assess(video_path: str, intended_prompt: str) -> QCVerdict:
-    """Run the multimodal QC check on one clip. (Depends on gemini_client.analyze_video — P5.)"""
+    """Run the multimodal QC check on one clip."""
     question = f"{QC_QUESTION}\n\nIntended prompt:\n{intended_prompt}"
     return analyze_video(video_path, question, schema=QCVerdict)
+
+
+# ── selection / gating helpers ────────────────────────────────────────────────
+# Reliability note: `adherence` / `entities_present` are the trustworthy signals
+# (vision models judge scene/subject well). `artifacts` / `lip_sync_ok` are
+# ADVISORY only — do not hard-gate on them or you will false-reject good takes.
+
+def passes_gate(v: QCVerdict, adherence_floor: float = 0.6) -> bool:
+    """Hard gate: the take is usable. Only the trustworthy signals gate."""
+    return bool(v.accept and v.entities_present and v.adherence >= adherence_floor)
+
+
+def score(v: QCVerdict) -> tuple:
+    """Ranking key for best-of-N (higher is better)."""
+    return (passes_gate(v), v.entities_present, v.adherence)
+
+
+def pick_best(candidates: list[tuple[str, QCVerdict]]) -> tuple[str, QCVerdict]:
+    """Choose the best (path, verdict) from candidates by `score`."""
+    return max(candidates, key=lambda c: score(c[1]))
