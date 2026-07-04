@@ -105,8 +105,11 @@ def _seed_globals(graph: PromptGraph, plan: StoryPlan) -> None:
             graph.set(key, val.strip(), Source.USER, 0.9, "story global (cross-shot consistency)")
 
 
-def build_story(user_prompt: str, *, evaluate_shots: bool = True) -> StoryBuild:
+def build_story(user_prompt: str, *, evaluate_shots: bool = True,
+                max_shots: int | None = None) -> StoryBuild:
     plan = plan_story(user_prompt)
+    if max_shots:
+        plan.shots = plan.shots[:max_shots]   # bound cost / clip count
     builds: list[ShotBuild] = []
     for si in plan.shots:
         g = PromptGraph.build()

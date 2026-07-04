@@ -299,16 +299,18 @@ def generate_story(
     min_quality: float = 0.6,
     max_invention: float = 0.9,
     confirm: bool = False,
+    max_shots: int | None = None,
     dry_run: bool = False,
 ) -> StoryResult:
     """Plan -> per-shot requirement graphs (shared globals) -> gate -> chained render.
 
     Gates on the WORST shot's quality/defects and the AVERAGE invention ratio before
     spending. Dispatches to veo.generate_chain (last-frame chaining; 1080p-capable).
+    max_shots caps the number of shots (bounds clip count / cost).
     """
     from .graph.prompt_story import build_story
 
-    sb = build_story(user_prompt)
+    sb = build_story(user_prompt, max_shots=max_shots)
     worst, avg_inv = sb.worst_overall, sb.avg_invention
     result = StoryResult(
         user_prompt=user_prompt, shot_prompts=sb.prompts, durations=sb.durations,

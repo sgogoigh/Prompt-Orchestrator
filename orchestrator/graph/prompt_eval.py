@@ -100,11 +100,14 @@ def evaluate(graph: PromptGraph) -> EvalReport:
     conflicts = list(pe.conflicts) + req_violations
 
     overall = 0.15 * completeness + 0.50 * pe.coherence + 0.35 * pe.specificity
-    overall -= 0.12 * min(len(conflicts), 3)   # each concrete conflict hurts
+    overall -= 0.12 * min(len(conflicts), 3)   # soft: coherence tensions penalize the score
     if missing_req:
         overall *= 0.5
     overall = max(0.0, min(1.0, overall))
-    has_defects = bool(missing_req or conflicts)
+    # HARD defects are structural only (missing-required or a 'requires'-edge violation).
+    # Soft coherence conflicts already hurt `overall`; they don't hard-gate on their own,
+    # otherwise the richer ontology (more nodes = more minor tensions) blocks everything.
+    has_defects = bool(missing_req or req_violations)
     return EvalReport(
         completeness=round(completeness, 3),
         coherence=round(pe.coherence, 3),

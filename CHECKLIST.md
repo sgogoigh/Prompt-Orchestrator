@@ -112,8 +112,21 @@ The thing the project was really after: evaluate/complete the PROMPT before gene
   complete), so the gate leans on **coherence + specificity + real defects (conflicts / missing-
   required)**, with `invention_ratio` as a transparency signal. Verified: refused a weak prompt
   (0.767, invention 0.895) with no spend; auto-revised a rich prompt to 0.982.
-- [ ] Follow-up (deferred by request): refine the ontology + dependency edges; extend to multi-shot;
-      optionally treat high `invention_ratio` as a "confirm before spend" prompt-back to the user.
+
+### Refinement pass ✅ (verified live, no Veo spend)
+- [x] **Ontology refined** — 23→**28 nodes** (added genre, pacing, weather, wardrobe, composition),
+      25→**44 edges** now carrying a KIND: `informs` / `constrains` / `requires`.
+- [x] **`requires` logic is a hard defect** (e.g. dialogue with no subject); soft coherence tensions
+      only penalize the score. Fixes over-strict gating with the richer ontology (barista story:
+      all shots defects=False, gate passes; hiker story: worst 0.59 → gated).
+- [x] **Invention-ratio policy** — `generate_gated(max_invention, confirm)`: if the graph invented
+      more than the threshold, returns `needs_confirmation` + the `inferred_fields` list (confirm
+      before spending) instead of silently generating an all-invented film.
+- [x] **Multi-shot** — `graph/prompt_story.py` (`plan_story` → per-shot graphs SEEDED with shared
+      globals for cross-shot consistency → per-shot eval) + `api.generate_story()` gates on the
+      WORST shot + AVERAGE invention, then dispatches to `generate_chain`. Demo: `examples/run_story.py`.
+      Verified: 4-shot barista story, consistent macro-coffee look across shots, gate passed.
+- [ ] Optional next: cross-shot narrative-continuity Gemini check; live chained story render.
 
 ## Cross-cutting (any phase)
 - [ ] `orchestrate/critique.py` — self-critique against Veo limitations
